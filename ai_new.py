@@ -4,17 +4,14 @@ Created by: Sultan Sidhu
 Date: Sunday, December 23, 2018
 *Created as a part of the Neural Networks and Artificial Intelligence course undertaken on Udemy.
 """
-
-import numpy as np
 import random
 import os  # loading and saving features through this library
 import torch
 import torch.nn as nn
 import torch.nn.functional as func
 import torch.optim as optim  # optimizer for stochastic gradient descent
-import torch.autograd as autograd
 from torch.autograd import Variable
-from typing import Deque
+from collections import deque
 
 # Creating Neural Network Architecture
 
@@ -46,7 +43,7 @@ class Replay(object):
 
     def __init__(self, capacity=100000):
         self.capacity = capacity  # the number of past experiences you want to store.
-        self.memory = Deque(maxlen=capacity)  # Deque is a collection type that will store stuff up till a max length
+        self.memory = deque(maxlen=capacity)  # Deque is a collection type that will store stuff up till a max length
         # and pop everything thereafter
 
     def sample(self, sample_size):
@@ -66,7 +63,7 @@ class DeepQNetwork:
 
     def __init__(self, input_size, nb_action, gamma):
         self.gamma = gamma
-        self.reward_window = []
+        self.reward_window = deque(maxlen=1000)
         self.model = Network(input_size, nb_action)
         self.memory = Replay()  # we took defualt = 100,000
         self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
@@ -80,7 +77,51 @@ class DeepQNetwork:
         probabilities = func.softmax(self.model.forward(Variable(state, volatile=True))*7)  # Temperature parameter = 7
         # Temperature parameters change the probabilities by polarizing them
         # Higher temp param => higher probs get higher and lower probs get lower
-        action = probabilities.multinomial()
+        action = probabilities.multinomial(num_samples=1)
         return action.data[0, 0]
 
-    
+    def learn(self, batch_state, batch_next_state, batch_reward, batch_action):
+        """Chungus"""
+        outputs = self.model(batch_state).gather(1, batch_action.unsqueeze(1)).squeeze(1)
+        next_outputs = self.model(batch_next_state).detach().max(1)[0]  # because the action index is 1
+        target = self.gamma * next_outputs + batch_reward
+        td_loss = func.smooth_l1_loss(outputs, target)
+        self.optimizer.zero_grad()  # reinitializes the optimizer at each iteration
+        td_loss.backward()
+        self.optimizer.step()  # updates weights according to their respective contribution to the td_loss
+
+    def update(self, reward, new_signal):
+        """Updates the neural network per iteration / move made."""
+        new_state = torch.Tensor(new_signal).float().unsqueeze(0)
+        self.memory.memory.append((
+            self.last_state, new_state, torch.LongTensor([int(self.last_action)]), torch.Tensor([self.last_reward])))
+        action = self.select_action(new_state)
+        if len(self.memory.memory) > 100:
+            batch_state, batch_next_state, batch_action, batch_reward = self.memory.sample(100)
+            self.learn(batch_state, batch_next_state, batch_reward, batch_action)
+        self.last_action = action
+        self.last_state = new_state
+        self.last_reward = reward
+        self.reward_window.append(reward)
+        return action
+
+    def score(self):
+        """Calculates score for the agent."""
+        return sum(self.reward_window)/(len(self.reward_window)+1)
+
+    def save(self):
+        """Saves the current state of the agent in its environment, along with its learning."""
+        torch.save({"state_dict": self.model.state_dict(),
+                    "optimizer": self.optimizer.state_dict()},
+                   "last_brain.pth")
+
+    def load(self):
+        """Loads a previously saved agent and brain."""
+        if os.path.isfile("last_brain.pth"):
+            print("Loading saved brain...")
+            checkpoint = torch.load("last_brain.pth")
+            self.model.load_state_dict(checkpoint['state_dict'])
+            self.optimizer.load_state_dict(checkpoint['optimizer'])
+            print('Done!')
+        else:
+            print('No checkpoint found! Start new learning session!')

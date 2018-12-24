@@ -17,7 +17,7 @@ from kivy.vector import Vector
 from kivy.clock import Clock
 
 # Importing the Dqn object from our AI in ai.py
-from ai import Dqn
+from ai_new import DeepQNetwork
 
 # Adding this line if we don't want the right click to put a red point
 Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
@@ -29,7 +29,7 @@ n_points = 0
 length = 0
 
 # Getting our AI, which we call "brain", and that contains our neural network that represents our Q-function
-brain = Dqn(5,3,0.9)
+brain = DeepQNetwork(5,3,0.9)
 action2rotation = [0,20,-20]
 last_reward = 0
 scores = []
@@ -52,7 +52,7 @@ last_distance = 0
 # Creating the car class
 
 class Car(Widget):
-    
+
     angle = NumericProperty(0)
     rotation = NumericProperty(0)
     velocity_x = NumericProperty(0)
