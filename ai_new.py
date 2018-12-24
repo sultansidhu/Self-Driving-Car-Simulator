@@ -48,3 +48,14 @@ class Replay(object):
         self.capacity = capacity  # the number of past experiences you want to store.
         self.memory = Deque(maxlen=capacity)  # Deque is a collection type that will store stuff up till a max length
         # and pop everything thereafter
+
+    def sample(self, sample_size):
+        """Gets a random sample from the memory of experiences."""
+        samples = zip(*random.sample(self.memory, sample_size))
+        # The zip function converts sublist format. So for all sublists within the given list, the zip function will
+        # convert it to form sublists of all indices i of both lists together.
+        # if there are more things in one sublist than are in the other sublist, the elements with no counterpart
+        # in the shorter sublist are ignored by the function
+        return map(lambda x: variable(torch.cat(x, 0)), samples)
+
+    
