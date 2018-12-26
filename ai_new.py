@@ -24,14 +24,18 @@ class Network(nn.Module):
         super(Network, self).__init__()
         self.input_size = input_size  # the number of dimensions in the vectors that are encoding the states
         self.nb_action = nb_action  # number of possible actions that the agent can make
-        self.fc1 = nn.Linear(input_size, 30)
-        self.fc2 = nn.Linear(30, nb_action)
+        self.fc1 = nn.Linear(input_size, 60)
+        self.fc3 = nn.Linear(60, 60)
+        self.fc4 = nn.Linear(60, 60)
+        self.fc2 = nn.Linear(60, nb_action)
         # the last two lines define how many neurons in each layer. in current setup, input_size in input layer,
         # 30 hidden neurons, and nb_action output neurons
 
     def forward(self, state):
         """Function that performs forward propogation, hence activating the neural network"""
         x = func.relu(self.fc1(state))
+        x = func.relu(self.fc3(x))
+        x = func.relu(self.fc4(x))
         q_values = self.fc2(x)
         return q_values
 
@@ -41,7 +45,7 @@ class Network(nn.Module):
 class Replay(object):
     """A class handling experience replay for the model."""
 
-    def __init__(self, capacity=100000):
+    def __init__(self, capacity=1000000):
         self.capacity = capacity  # the number of past experiences you want to store.
         self.memory = deque(maxlen=capacity)  # Deque is a collection type that will store stuff up till a max length
         # and pop everything thereafter
@@ -74,7 +78,8 @@ class DeepQNetwork:
 
     def select_action(self, state):
         """Selects the optimal action for the agent to take."""
-        probabilities = func.softmax(self.model.forward(Variable(state, volatile=True))*7)  # Temperature parameter = 7
+        probabilities = func.softmax(self.model.forward(Variable(state, volatile=True))*100)
+        # Temperature parameter = 7 but made = 0 in order to deactivate the AI
         # Temperature parameters change the probabilities by polarizing them
         # Higher temp param => higher probs get higher and lower probs get lower
         action = probabilities.multinomial(num_samples=1)
@@ -96,7 +101,7 @@ class DeepQNetwork:
         self.memory.memory.append((
             self.last_state, new_state, torch.LongTensor([int(self.last_action)]), torch.Tensor([self.last_reward])))
         action = self.select_action(new_state)
-        if len(self.memory.memory) > 100:
+        if len(self.memory.memory) > 1000:
             batch_state, batch_next_state, batch_action, batch_reward = self.memory.sample(100)
             self.learn(batch_state, batch_next_state, batch_reward, batch_action)
         self.last_action = action
